@@ -73,6 +73,8 @@ claude plugin install token-heatmap@claude-code-token-heatmap
 
 Start a new session and type `/tokens`.
 
+The installer may report that two options aren't set yet. You can ignore that: both have defaults (see [Configuration](#configuration)).
+
 ### Option B: from a clone
 
 ```bash
