@@ -1,0 +1,20 @@
+{
+  "name": "claude-code-token-heatmap",
+  "owner": {
+    "name": "vus955-gif",
+    "url": "https://github.com/vus955-gif"
+  },
+  "metadata": {
+    "description": "Token usage per day for Claude Code, as a heatmap pane"
+  },
+  "plugins": [
+    {
+      "name": "token-heatmap",
+      "source": "./",
+      "description": "A /tokens pane for Claude Code: tokens used per day as a heatmap, each API response counted once",
+      "version": "1.0.0",
+      "license": "MIT",
+      "keywords": ["tokens", "usage", "statistics", "heatmap"]
+    }
+  ]
+}

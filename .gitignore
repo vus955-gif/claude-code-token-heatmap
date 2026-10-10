@@ -1,0 +1,12 @@
+# Type declarations Claude Code writes beside a plugin it loads from a folder you own
+.claude-plugin/types/
+/tsconfig.json
+
+# Local tooling and secrets
+.claude/
+node_modules/
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db

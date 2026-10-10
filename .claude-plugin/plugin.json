@@ -1,0 +1,29 @@
+{
+  "name": "token-heatmap",
+  "version": "1.0.0",
+  "description": "A /tokens pane for Claude Code: tokens used per day as a heatmap, each API response counted once",
+  "author": {
+    "name": "vus955-gif",
+    "url": "https://github.com/vus955-gif"
+  },
+  "homepage": "https://github.com/vus955-gif/claude-code-token-heatmap",
+  "repository": "https://github.com/vus955-gif/claude-code-token-heatmap",
+  "license": "MIT",
+  "keywords": ["tokens", "usage", "statistics", "heatmap", "pane", "mod"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "Language of the pane: auto (from your system locale), en or pl",
+      "default": "auto",
+      "options": ["auto", "en", "pl"]
+    },
+    "nodePath": {
+      "type": "string",
+      "title": "Node.js command",
+      "description": "Command or full path of Node.js 18+, which runs the token counter",
+      "default": "node"
+    }
+  }
+}
