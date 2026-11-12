@@ -26,6 +26,8 @@ type Strings = {
   loading: string
   error: string
   nodeMissing: (command: string) => string
+  timedOut: (minutes: number) => string
+  unreadable: (count: string) => string
   total: string
   today: string
   last7: string
@@ -58,6 +60,8 @@ export const STRINGS: Record<Lang, Strings> = {
     error: 'Error',
     nodeMissing: command =>
       `Could not run “${command}”. Install Node.js 18 or newer, or set the plugin option “nodePath”.`,
+    timedOut: minutes => `The count was stopped after ${minutes} minutes. Press “Refresh” to try again.`,
+    unreadable: count => `Transcripts that could not be read: ${count}. Some tokens may be missing from the totals.`,
     total: 'Total',
     today: 'Today',
     last7: 'Last 7 days',
@@ -88,6 +92,8 @@ export const STRINGS: Record<Lang, Strings> = {
     error: 'Błąd',
     nodeMissing: command =>
       `Nie udało się uruchomić „${command}”. Zainstaluj Node.js 18+ albo ustaw opcję wtyczki „nodePath”.`,
+    timedOut: minutes => `Liczenie przerwano po ${minutes} minutach. Naciśnij „Odśwież”, aby spróbować ponownie.`,
+    unreadable: count => `Nie udało się odczytać transkryptów: ${count}. Część tokenów może nie być policzona.`,
     total: 'Łącznie',
     today: 'Dziś',
     last7: 'Ostatnie 7 dni',

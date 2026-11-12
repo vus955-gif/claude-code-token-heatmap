@@ -81,3 +81,45 @@ test('a missing Node.js shows how to fix it', { options: { language: 'en', nodeP
   expect(await ui.find({ type: 'Text', text: /no-such-node.*nodePath/ })).toBeDefined()
   await ui.unmount()
 })
+
+for (const c of [
+  { language: 'en', timeout: /stopped after 5 minutes/, unreadable: /could not be read: 2/ },
+  { language: 'pl', timeout: /przerwano po 5 minutach/, unreadable: /odczytać transkryptów: 2/ },
+] as const) {
+  test(`a count that runs too long says so, not that Node.js is missing (${c.language})`, { options: { language: c.language } }, async ($, on) => {
+    const clock = mock.clock(on)
+    // How the engine rejects $.process.run once the timeout has passed.
+    on('process.run', async () => ({ deny: 'aborted: still running after 300000ms' }))
+
+    const ui = await $.ui.mount({
+      plugin: 'token-heatmap', surface: 'desktop', component: 'Pane', requestId: 'token-heatmap', props: PANE_PROPS,
+    })
+    await ui.press({ key: 'refresh' })
+    await clock.advance(50)
+    expect(await ui.find({ type: 'Text', text: c.timeout })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /nodePath/ })).toBeUndefined()
+    await ui.unmount()
+  })
+
+  test(`transcripts the counter could not read are reported (${c.language})`, { options: { language: c.language } }, async ($, on) => {
+    const clock = mock.clock(on)
+    on('process.run', async () => ({
+      value: {
+        exitCode: 0,
+        stdout: JSON.stringify({ ...FIXTURE, errors: 2 }),
+        stderr: '',
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
+    }))
+
+    const ui = await $.ui.mount({
+      plugin: 'token-heatmap', surface: 'terminal', component: 'Pane', requestId: 'token-heatmap', props: PANE_PROPS,
+    })
+    await ui.press({ key: 'refresh' })
+    await clock.advance(50)
+    await ui.drawn()
+    expect(await ui.find({ type: 'Text', text: c.unreadable })).toBeDefined()
+    await ui.unmount()
+  })
+}

@@ -208,6 +208,10 @@ hooks/register.tsx      (the plugin's hooks module inside Claude Code)
 
 **“Could not run "node"”.** Install Node.js 18+ or set `nodePath` to its full path. Desktop apps on macOS often don't see the shell's `PATH`, so use e.g. `/opt/homebrew/bin/node` or `/usr/local/bin/node` (run `which node` in a terminal to find yours).
 
+**“The count was stopped after 5 minutes”.** One count may run for 5 minutes; a normal first count takes seconds. A slow or network drive, or an antivirus scanning every transcript, can make it longer. Press **Refresh** to try again.
+
+**“Transcripts that could not be read: N”.** The counter could not open N transcript files, for example because another program held them. It tries them again on the next count; until then their tokens may be missing from the totals.
+
 **The totals are lower than the built-in panel's.** That's expected; see [Why the totals differ](#why-the-totals-differ-from-the-built-in-stats).
 
 **The heatmap starts only a few weeks back.** The plugin can only count transcripts that still exist when it first runs, and by default Claude Code keeps about 30 days. From the first run on, history is kept. To keep more transcripts as well, raise `cleanupPeriodDays` in `~/.claude/settings.json`.
