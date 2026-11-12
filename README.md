@@ -238,11 +238,20 @@ scripts/
   preview.mjs          draws docs/preview-*.svg from synthetic data
 tests/
   render.test.tsx      the pane in English and Polish, on desktop and in the terminal
+  aggregate.test.mjs   the token counter on synthetic transcripts (node --test)
 types/
   index.d.ts           the report's shape and the plugin's state contract
+.github/workflows/
+  ci.yml               runs both test suites on every push and pull request
 ```
 
-Check and test with the Claude Code CLI:
+Test the token counter with Node.js (18 or newer). The tests build synthetic transcripts in a temporary folder and never read your own `~/.claude`:
+
+```bash
+node --test tests/aggregate.test.mjs
+```
+
+Check and test the pane with the Claude Code CLI:
 
 ```bash
 claude plugin validate .
