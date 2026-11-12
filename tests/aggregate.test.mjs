@@ -131,6 +131,47 @@ test('a transcript deleted by Claude Code’s cleanup stays counted through the 
     assert.deepEqual(after.days, before.days)
   }))
 
+test('a cached response moves to the right local day when the time zone changes', () =>
+  withConfigDir(dir => {
+    // 23:30 UTC on 1 October is already 08:30 on 2 October in Tokyo.
+    transcript(dir, 'session.jsonl', line({ id: 'msg_1', timestamp: '2026-10-01T23:30:00.000Z', output: 5, cacheRead: 500 }))
+
+    const utc = count(dir, { tz: 'UTC' })
+    assert.deepEqual(Object.keys(utc.days), ['2026-10-01'])
+
+    // The transcript is unchanged, so this run answers from the cache.
+    const tokyo = count(dir, { tz: 'Asia/Tokyo' })
+    assert.equal(tokyo.reparsed, 0)
+    assert.deepEqual(Object.keys(tokyo.days), ['2026-10-02'])
+  }))
+
+test('a version 1 cache keeps the history of deleted transcripts', () =>
+  withConfigDir(dir => {
+    // Version 1 stored each response's local day instead of its time.
+    const live = transcript(dir, 'live.jsonl', line({ id: 'msg_live', timestamp: '2026-10-01T23:30:00.000Z', output: 3, cacheRead: 30 }))
+    const deleted = path.join(dir, 'projects', '-tmp-demo', 'deleted.jsonl')
+    const cacheFile = path.join(dir, 'token-heatmap', 'cache.json')
+    fs.mkdirSync(path.dirname(cacheFile), { recursive: true })
+    fs.writeFileSync(cacheFile, JSON.stringify({
+      version: 1,
+      files: {
+        [live]: { size: 1, mtimeMs: 1, parsedBytes: 1, msgs: { msg_live: ['2026-10-01', MODEL, 0, 3, 0, 30] } },
+        [deleted]: { size: 1, mtimeMs: 1, parsedBytes: 1, msgs: { msg_deleted: ['2026-09-20', MODEL, 0, 2, 0, 20] } },
+      },
+      archive: { msg_archived: ['2026-09-15', MODEL, 0, 1, 0, 10] },
+    }))
+
+    const report = count(dir, { tz: 'Asia/Tokyo' })
+    assert.equal(report.messages, 3)
+    assert.deepEqual(report.days, {
+      '2026-09-15': { [MODEL]: [0, 1, 0, 10] },
+      '2026-09-20': { [MODEL]: [0, 2, 0, 20] },
+      // Read again from the transcript, so on Tokyo's day.
+      '2026-10-02': { [MODEL]: [0, 3, 0, 30] },
+    })
+    assert.equal(JSON.parse(fs.readFileSync(cacheFile, 'utf8')).version, 2)
+  }))
+
 test('an unchanged transcript is not read again', () =>
   withConfigDir(dir => {
     transcript(dir, 'session.jsonl', line({ id: 'msg_1', output: 1, cacheRead: 10 }))

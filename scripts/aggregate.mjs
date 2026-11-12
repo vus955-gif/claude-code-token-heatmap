@@ -10,11 +10,13 @@
 // - files that grew are read from where the last run stopped (JSONL is append-only),
 // - responses from transcripts that Claude Code's cleanup deleted move to an
 //   archive, so the heatmap keeps those days.
+// The cache keeps each response's time, not its day: the local day is worked
+// out for every report, so a change of time zone moves cached responses too.
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
 const projectsDir = path.join(configDir, 'projects')
 const cacheDir = path.join(configDir, 'token-heatmap')
@@ -24,11 +26,32 @@ const pad = n => String(n).padStart(2, '0')
 const localDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 function loadCache() {
-  try {
-    const cache = JSON.parse(fs.readFileSync(cachePath, 'utf8'))
-    if (cache.version === CACHE_VERSION) return cache
-  } catch {}
-  return { version: CACHE_VERSION, files: {}, archive: {} }
+  let cache
+  try { cache = JSON.parse(fs.readFileSync(cachePath, 'utf8')) } catch {}
+  if (cache?.version === CACHE_VERSION) return cache
+  const fresh = { version: CACHE_VERSION, files: {}, archive: {} }
+  if (cache?.version === 1) {
+    // Version 1 kept each response's local day ("YYYY-MM-DD") instead of its
+    // time. Transcripts that still exist are read again; for those already
+    // deleted the cache is all that is left, so their responses move to the
+    // archive, each at noon of its day.
+    for (const [file, entry] of Object.entries(cache.files ?? {})) {
+      if (!fs.existsSync(file)) keepLarger(fresh.archive, fromDays(entry?.msgs))
+    }
+    keepLarger(fresh.archive, fromDays(cache.archive))
+  }
+  return fresh
+}
+
+function fromDays(msgs) {
+  const out = {}
+  for (const [id, rec] of Object.entries(msgs ?? {})) {
+    if (!Array.isArray(rec)) continue
+    const [y, m, d] = String(rec[0]).split('-').map(Number)
+    const time = new Date(y, m - 1, d, 12).getTime()
+    if (Number.isFinite(time)) out[id] = [time, ...rec.slice(1)]
+  }
+  return out
 }
 
 function saveCache(cache) {
@@ -51,7 +74,15 @@ function listTranscripts(dir, out = []) {
 
 const sum = rec => rec[2] + rec[3] + rec[4] + rec[5]
 
-// A record: [day, model, input, output, cacheWrite, cacheRead]
+/** Copies each response of `from` into `into` unless `into` already holds a larger count of it. */
+function keepLarger(into, from) {
+  for (const [id, rec] of Object.entries(from)) {
+    const prev = into[id]
+    if (!prev || sum(rec) > sum(prev)) into[id] = rec
+  }
+}
+
+// A record: [time (ms since 1970, UTC), model, input, output, cacheWrite, cacheRead]
 function handleLine(line, msgs) {
   // Cheap filter before paying for JSON.parse on long tool-result lines.
   if (!line.includes('"usage"') || !line.includes('"assistant"')) return
@@ -59,9 +90,10 @@ function handleLine(line, msgs) {
   try { o = JSON.parse(line) } catch { return }
   const id = o?.message?.id
   const u = o?.message?.usage
-  if (o.type !== 'assistant' || !id || !u || !o.timestamp) return
+  const time = Date.parse(o.timestamp)
+  if (o.type !== 'assistant' || !id || !u || !Number.isFinite(time)) return
   const rec = [
-    localDay(new Date(o.timestamp)),
+    time,
     o.message.model || 'unknown',
     u.input_tokens || 0,
     u.output_tokens || 0,
@@ -125,10 +157,7 @@ async function main() {
   // Transcripts deleted by Claude Code's cleanup: keep their responses in the archive.
   for (const file of Object.keys(cache.files)) {
     if (alive.has(file)) continue
-    for (const [id, rec] of Object.entries(cache.files[file].msgs)) {
-      const prev = cache.archive[id]
-      if (!prev || sum(rec) > sum(prev)) cache.archive[id] = rec
-    }
+    keepLarger(cache.archive, cache.files[file].msgs)
     delete cache.files[file]
   }
 
@@ -142,10 +171,10 @@ async function main() {
     }
   }
 
-  // days[day][model] = [input, output, cacheWrite, cacheRead]
+  // days[day][model] = [input, output, cacheWrite, cacheRead], each day local
   const days = {}
-  for (const [day, model, i, o, cw, cr] of all.values()) {
-    const byModel = (days[day] ??= {})
+  for (const [time, model, i, o, cw, cr] of all.values()) {
+    const byModel = (days[localDay(new Date(time))] ??= {})
     const acc = (byModel[model] ??= [0, 0, 0, 0])
     acc[0] += i; acc[1] += o; acc[2] += cw; acc[3] += cr
   }

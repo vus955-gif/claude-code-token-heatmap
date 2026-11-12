@@ -193,12 +193,12 @@ hooks/register.tsx      (the plugin's hooks module inside Claude Code)
 
 - **Incremental reads.** The cache remembers each transcript's size and how far it was read. An unchanged file is skipped; a file that grew is read only from where the last run stopped.
 - **Surviving cleanup.** Claude Code deletes transcripts older than `cleanupPeriodDays` (30 by default). When a transcript disappears, its per-response totals move to an archive inside the cache, so those days stay on the heatmap.
-- **Local days.** A response belongs to the day of its timestamp in your local time zone.
+- **Local days.** A response belongs to the day of its timestamp in your local time zone. The cache keeps the timestamp, and the day is worked out on every count, so after you change time zones the whole history follows.
 
 ## Privacy
 
 - The plugin **reads** only `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`).
-- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its date, model name and the four token counts. **No prompts, replies, file contents or paths of your projects' files.**
+- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its time, model name and the four token counts. **No prompts, replies, file contents or paths of your projects' files.**
 - It makes **no network requests**.
 - Delete `~/.claude/token-heatmap/` at any time. The next count rebuilds it from the transcripts that still exist.
 
