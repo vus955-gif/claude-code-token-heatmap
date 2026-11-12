@@ -149,7 +149,7 @@ The plugin de-duplicates by `message.id`. While a response is streaming, earlier
 
 | Option | Values | Default | Effect |
 |---|---|---|---|
-| `language` | `auto`, `en`, `pl` | `auto` | Language of the pane. `auto` picks Polish for a Polish system locale and English otherwise. |
+| `language` | `auto`, `en`, `pl` | `auto` | Language of the pane. `auto` picks Polish for a Polish system locale and English otherwise. The locale is `LC_ALL`, `LC_MESSAGES` or `LANG` when one is set, otherwise the system's region setting. |
 | `nodePath` | a command or a full path | `node` | How the token counter is started, e.g. `/opt/homebrew/bin/node` |
 
 Set them with `/plugin configure token-heatmap@claude-code-token-heatmap` inside Claude Code, or from a shell:

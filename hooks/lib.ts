@@ -115,7 +115,7 @@ export const STRINGS: Record<Lang, Strings> = {
   },
 }
 
-/** `auto` follows the locale the aggregator saw on this machine; Polish locales get Polish. */
+/** `auto` follows the machine's locale (`pl-PL`, `pl_PL.UTF-8`, ...): Polish locales get Polish. */
 export function pickLang(preference: unknown, locale: string | undefined): Lang {
   if (preference === 'en' || preference === 'pl') return preference
   return locale?.toLowerCase().startsWith('pl') ? 'pl' : 'en'
