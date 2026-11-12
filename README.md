@@ -198,7 +198,8 @@ hooks/register.tsx      (the plugin's hooks module inside Claude Code)
 ## Privacy
 
 - The plugin **reads** only `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`).
-- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its time, model name and the four token counts. **No prompts, replies, file contents or paths of your projects' files.**
+- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its message id, time, model name and the four token counts. **No prompts, replies or file contents.**
+- The cache does list your transcripts by their full paths, e.g. `~/.claude/projects/-home-me-work-acme/<session id>.jsonl`. Claude Code names those folders after your project folders, so the cache shows which folders you used Claude Code in, as `~/.claude/projects` itself does. Keep that in mind before you share the file.
 - It makes **no network requests**.
 - Delete `~/.claude/token-heatmap/` at any time. The next count rebuilds it from the transcripts that still exist.
 
