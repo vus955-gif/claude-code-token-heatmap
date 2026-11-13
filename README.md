@@ -149,7 +149,7 @@ The plugin de-duplicates by `message.id`. While a response is streaming, earlier
 
 | Option | Values | Default | Effect |
 |---|---|---|---|
-| `language` | `auto`, `en`, `pl` | `auto` | Language of the pane. `auto` picks Polish for a Polish system locale and English otherwise. |
+| `language` | `auto`, `en`, `pl` | `auto` | Language of the pane. `auto` picks Polish for a Polish system locale and English otherwise. The locale is `LC_ALL`, `LC_MESSAGES` or `LANG` when one is set, otherwise the system's region setting. |
 | `nodePath` | a command or a full path | `node` | How the token counter is started, e.g. `/opt/homebrew/bin/node` |
 
 Set them with `/plugin configure token-heatmap@claude-code-token-heatmap` inside Claude Code, or from a shell:
@@ -193,12 +193,13 @@ hooks/register.tsx      (the plugin's hooks module inside Claude Code)
 
 - **Incremental reads.** The cache remembers each transcript's size and how far it was read. An unchanged file is skipped; a file that grew is read only from where the last run stopped.
 - **Surviving cleanup.** Claude Code deletes transcripts older than `cleanupPeriodDays` (30 by default). When a transcript disappears, its per-response totals move to an archive inside the cache, so those days stay on the heatmap.
-- **Local days.** A response belongs to the day of its timestamp in your local time zone.
+- **Local days.** A response belongs to the day of its timestamp in your local time zone. The cache keeps the timestamp, and the day is worked out on every count, so after you change time zones the whole history follows.
 
 ## Privacy
 
 - The plugin **reads** only `~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`).
-- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its date, model name and the four token counts. **No prompts, replies, file contents or paths of your projects' files.**
+- It **writes** only `~/.claude/token-heatmap/cache.json`. For each API response, the cache holds its message id, time, model name and the four token counts. **No prompts, replies or file contents.**
+- The cache does list your transcripts by their full paths, e.g. `~/.claude/projects/-home-me-work-acme/<session id>.jsonl`. Claude Code names those folders after your project folders, so the cache shows which folders you used Claude Code in, as `~/.claude/projects` itself does. Keep that in mind before you share the file.
 - It makes **no network requests**.
 - Delete `~/.claude/token-heatmap/` at any time. The next count rebuilds it from the transcripts that still exist.
 
@@ -207,6 +208,10 @@ hooks/register.tsx      (the plugin's hooks module inside Claude Code)
 **`/tokens` doesn't exist.** Start a new session after installing, and check that the plugin is enabled (`/plugin`). Hooks modules are early access: if they're switched off in your build, set `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` in the `env` block of `~/.claude/settings.json`.
 
 **“Could not run "node"”.** Install Node.js 18+ or set `nodePath` to its full path. Desktop apps on macOS often don't see the shell's `PATH`, so use e.g. `/opt/homebrew/bin/node` or `/usr/local/bin/node` (run `which node` in a terminal to find yours).
+
+**“The count was stopped after 5 minutes”.** One count may run for 5 minutes; a normal first count takes seconds. A slow or network drive, or an antivirus scanning every transcript, can make it longer. Press **Refresh** to try again.
+
+**“Transcripts that could not be read: N”.** The counter could not open N transcript files, for example because another program held them. It tries them again on the next count; until then their tokens may be missing from the totals.
 
 **The totals are lower than the built-in panel's.** That's expected; see [Why the totals differ](#why-the-totals-differ-from-the-built-in-stats).
 
@@ -238,11 +243,20 @@ scripts/
   preview.mjs          draws docs/preview-*.svg from synthetic data
 tests/
   render.test.tsx      the pane in English and Polish, on desktop and in the terminal
+  aggregate.test.mjs   the token counter on synthetic transcripts (node --test)
 types/
   index.d.ts           the report's shape and the plugin's state contract
+.github/workflows/
+  ci.yml               runs both test suites on every push and pull request
 ```
 
-Check and test with the Claude Code CLI:
+Test the token counter with Node.js (18 or newer). The tests build synthetic transcripts in a temporary folder and never read your own `~/.claude`:
+
+```bash
+node --test tests/aggregate.test.mjs
+```
+
+Check and test the pane with the Claude Code CLI:
 
 ```bash
 claude plugin validate .

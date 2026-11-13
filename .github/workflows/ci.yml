@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  counter:
+    # The token counter runs on the user's own Node.js: check every version the README allows.
+    name: Token counter on Node.js ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test tests/aggregate.test.mjs
+
+  plugin:
+    # The hooks-module API is early access and changes between releases, so the
+    # Claude Code version is pinned; raise it after checking the plugin against a newer one.
+    name: Plugin validate and test (Claude Code ${{ matrix.claude }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        claude: ['2.1.321']
+    env:
+      DISABLE_AUTOUPDATER: '1'
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm install --global @anthropic-ai/claude-code@${{ matrix.claude }}
+      - run: claude --version
+      - run: claude plugin validate .
+      - run: claude plugin test .

@@ -1,6 +1,6 @@
 {
   "name": "token-heatmap",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A /tokens pane for Claude Code: tokens used per day as a heatmap, each API response counted once",
   "author": {
     "name": "vus955-gif",

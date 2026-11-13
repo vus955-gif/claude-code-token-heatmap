@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { LoadStatus, TokenReport } from '../types'
 import {
   DAY_MS,
+  type Lang,
   STRINGS,
   formatCount,
   formatTokens,
@@ -17,10 +18,36 @@ import {
 } from './lib'
 
 const PANE = 'token-heatmap'
+/** How long one count may run before the engine stops it. */
+const TIMEOUT_MS = 5 * 60_000
 const report = atom({ plugin: 'token-heatmap', key: 'report' } as const, null as TokenReport | null)
 const status = atom({ plugin: 'token-heatmap', key: 'status' } as const, { kind: 'idle' } as LoadStatus)
 
 const lastLine = (text: string) => text.trim().split('\n').pop() ?? ''
+
+/**
+ * This machine's locale, for `language: auto` before a count has reported the
+ * one Node.js sees: the first of LC_ALL, LC_MESSAGES and LANG that is set (what
+ * a terminal on macOS or Linux gives), else the engine's own default, which
+ * follows the system's region settings (Windows, apps started from a desktop).
+ */
+async function systemLocale($: EngineInterface): Promise<string | undefined> {
+  try {
+    const fromEnv = (await $.env.get('LC_ALL')) || (await $.env.get('LC_MESSAGES')) || (await $.env.get('LANG'))
+    if (fromEnv) return fromEnv
+  } catch {}
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().locale
+  } catch {
+    return undefined
+  }
+}
+
+/** The pane's language: the option, else the locale of the last count, else this machine's. */
+async function langOf($: EngineInterface, language: unknown, data: TokenReport | null): Promise<Lang> {
+  if (language === 'en' || language === 'pl') return language
+  return pickLang(language, data?.locale ?? (await systemLocale($)))
+}
 
 /** Runs scripts/aggregate.mjs with Node.js and stores its report in $.state. */
 async function refresh($: EngineInterface, nodePath: string) {
@@ -28,10 +55,15 @@ async function refresh($: EngineInterface, nodePath: string) {
   await update($, status, () => ({ kind: 'loading' }) as LoadStatus)
   let run
   try {
-    run = await $.process.run([nodePath, `${$.plugin.root}/scripts/aggregate.mjs`], { timeoutMs: 5 * 60_000 })
+    run = await $.process.run([nodePath, `${$.plugin.root}/scripts/aggregate.mjs`], { timeoutMs: TIMEOUT_MS })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await update($, status, () => ({ kind: 'error', message, command: nodePath }) as LoadStatus)
+    // Past the time limit the engine kills the counter and rejects with
+    // "aborted: still running after …ms"; any other rejection means Node.js did not start.
+    const timedOut = message.includes('still running after')
+    await update($, status, () =>
+      (timedOut ? { kind: 'error', message, timedOut: true } : { kind: 'error', message, command: nodePath }) as LoadStatus,
+    )
     return
   }
   try {
@@ -62,7 +94,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'tokens',
-      description: STRINGS[pickLang(language, undefined)].commandDescription,
+      description: STRINGS[await langOf($, language, null)].commandDescription,
       immediate: true,
     })
 
@@ -71,7 +103,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'tokens' }, async $ => {
     const data = await read($, report)
-    await $.ui.open({ id: PANE, title: STRINGS[pickLang(language, data?.locale)].title })
+    await $.ui.open({ id: PANE, title: STRINGS[await langOf($, language, data)].title })
     scheduleRefresh($, nodePath)
 
     return {}
@@ -82,7 +114,7 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = ui
     const data = await read($, report)
     const st = await read($, status)
-    const lang = pickLang(language, data?.locale)
+    const lang = await langOf($, language, data)
     const s = STRINGS[lang]
     const isLoading = st.kind === 'loading'
 
@@ -95,7 +127,11 @@ export const register: Register = (on, options) => {
     const error =
       st.kind === 'error' ? (
         <Text color="red">
-          {st.command ? `${s.nodeMissing(st.command)} (${st.message})` : `${s.error}: ${st.message}`}
+          {st.timedOut
+            ? s.timedOut(TIMEOUT_MS / 60_000)
+            : st.command
+              ? `${s.nodeMissing(st.command)} (${st.message})`
+              : `${s.error}: ${st.message}`}
         </Text>
       ) : null
 
@@ -108,6 +144,10 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
+
+    // Transcripts the counter could not stat or read; it tries them again next time.
+    const unreadable =
+      data.errors > 0 ? <Text color="yellow">{s.unreadable(formatCount(data.errors, lang))}</Text> : null
 
     const days = summarize(data)
     const sum = summaryOf(days, data.today)
@@ -159,6 +199,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column" gap={1}>
         {header}
         {error}
+        {unreadable}
         {tileRow}
         {chart}
         <Text dimColor>

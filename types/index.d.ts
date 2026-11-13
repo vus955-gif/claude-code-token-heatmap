@@ -31,8 +31,11 @@ export type TokenReport = {
 export type LoadStatus =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  /** `command` is set when Node.js could not be started at all. */
-  | { kind: 'error'; message: string; command?: string }
+  /**
+   * `command` is set when Node.js could not be started at all, `timedOut` when
+   * the count ran past its time limit and was stopped.
+   */
+  | { kind: 'error'; message: string; command?: string; timedOut?: boolean }
 
 declare module 'claude-code' {
   interface PluginState {
